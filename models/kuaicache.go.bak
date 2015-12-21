@@ -1,0 +1,50 @@
+package models
+
+import (
+	"github.com/astaxie/beego"
+	"github.com/astaxie/beego/cache"
+	_ "github.com/astaxie/beego/cache/redis"
+	"github.com/astaxie/beego/logs"
+	"github.com/astaxie/beego/orm"
+	"github.com/fatih/structs"
+)
+
+type Kuaicache struct {
+	gameKey string
+}
+
+var bm cache.Cache
+
+var _prefix = "game"
+
+func init() {
+	redissetting := "{\"conn\":\"" + beego.AppConfig.String("redisServers") + "\"}"
+	bm, _ = cache.NewCache("redis", redissetting)
+}
+
+func (this *Kuaicache) GetGameCache(gameKey string) (bool, map[string]interface{}) {
+	log := logs.NewLogger(1000)
+	log.SetLogger("file", `{"filename":"D:/test.log"}`)
+	if bm.IsExist("game_id_") {
+		log.Info("yes cache ")
+		info := bm.Do("HGET", "game_id_:"+gameKey)
+		return this.GetGameCacheById(info[gameKey])
+	} else {
+		log.Info("no cache ")
+		om := orm.NewOrm()
+		game := Game{Game_key: gameKey}
+		err := om.Read(&game, "Game_key")
+		if err != orm.ErrNoRows {
+			mapp := structs.Map(game)
+			return true, mapp
+		}
+		return false, nil
+	}
+}
+
+func (this *Kuaicache) GetGameCacheById(gameId string) (bool, map[string]interface{}) {
+	if bm.IsExist("game_info:" + gameId) {
+		return true, bm.Get("game_id_" + gameId).(map[string]interface{})
+	}
+	return false, nil
+}
